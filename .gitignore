@@ -1,0 +1,45 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# VS Code settings
+.vscode/
+
+# Mac OS
+.DS_Store
+
+# Test & coverage outputs
+.coverage
+coverage.xml
+htmlcov/
+*.log
+
+# Pytest cache
+.pytest_cache/
+
+# Environment files
+.env
+.env.*
+
+# MyPy, Pylint, etc.
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Pydantic-generated models (if using codegen)
+*.schema.json
+
+# FastAPI static files (optional)
+staticfiles/
