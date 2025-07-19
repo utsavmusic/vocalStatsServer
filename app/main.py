@@ -6,8 +6,7 @@ from fastapi import APIRouter
 from app.api.audio_analyzer import router as audio_router
 
 router = APIRouter()
-app = FastAPI()
-
+app = FastAPI(debug=True)
 logger = get_logger(__name__)
 
 # Configure CORS and exception handlers

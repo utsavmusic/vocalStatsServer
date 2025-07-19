@@ -1,6 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File,Query
 from app.services.pitch_service import get_extreme_notes
 import librosa
+import shutil
+from app.services.audio_service import AudioService
 import os
 
 router = APIRouter()
@@ -11,7 +13,6 @@ async def api_notes(audio: UploadFile = File(...)):
     os.makedirs("temp", exist_ok=True)
     with open(file_location, "wb") as f:
         f.write(await audio.read())
-
     y, sr = librosa.load(file_location)
     extreme_notes = get_extreme_notes(y, sr)
     os.remove(file_location)
@@ -35,3 +36,24 @@ async def api_amplitude_time_series(audio: UploadFile = File(...)):
         'amplitude_time_series': y_downsampled.tolist(),
         'sample_rate': sr
     }
+
+
+
+@router.post("/analyze")
+async def analyze_audio(
+    file: UploadFile = File(...),
+    stems: int = Query(2, description="Number of stems (e.g., 2 or 5)"),
+    model: str = Query("spleeter", description="Model name")
+):
+    # Save uploaded file temporarily
+    input_path = f"/tmp/{file.filename}"
+    with open(input_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Call service
+    service = AudioService(model_name=model)
+    output_dir = service.process_audio(input_path, stems)
+
+    # Clean up input file
+    os.remove(input_path)
+    return {"message": f"Audio separated into {stems} stems", "output_dir": output_dir}
