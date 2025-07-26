@@ -3,7 +3,9 @@ from app.services.pitch_service import get_extreme_notes
 import librosa
 import shutil
 from app.services.audio_service import AudioService
+from app.utils.file_utils import create_zip_archive
 import os
+from pathlib import Path
 
 router = APIRouter()
 
@@ -45,15 +47,29 @@ async def analyze_audio(
     stems: int = Query(2, description="Number of stems (e.g., 2 or 5)"),
     model: str = Query("spleeter", description="Model name")
 ):
-    # Save uploaded file temporarily
-    input_path = f"/tmp/{file.filename}"
-    with open(input_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        # Save uploaded file temporarily
+        input_path = f"/tmp/{file.filename}"
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # Call service
-    service = AudioService(model_name=model)
-    output_dir = service.process_audio(input_path, stems)
+        # Call service
+        service = AudioService(model_name=model)
+        output_dir = service.process_audio(input_path, stems)
+        output_path = Path(output_dir)
 
-    # Clean up input file
-    os.remove(input_path)
-    return {"message": f"Audio separated into {stems} stems", "output_dir": output_dir}
+        # Get all files in the output directory
+        files_to_zip = list(output_path.glob('*'))
+
+        # Create and return zip archive using utility function
+        return create_zip_archive(
+            files=files_to_zip,
+            output_dir=output_path,
+            archive_name=f"separated_audio_{file.filename}"
+        )
+
+    finally:
+        # Clean up
+        os.remove(input_path)
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
