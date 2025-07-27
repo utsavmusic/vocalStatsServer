@@ -1,4 +1,8 @@
+from http.client import HTTPException
+
 from fastapi import APIRouter, UploadFile, File,Query
+from starlette.responses import FileResponse
+
 from app.services.pitch_service import get_extreme_notes
 import librosa
 import shutil
@@ -6,6 +10,8 @@ from app.services.audio_service import AudioService
 from app.utils.file_utils import create_zip_archive
 import os
 from pathlib import Path
+import uuid
+from datetime import datetime
 
 router = APIRouter()
 
@@ -47,29 +53,34 @@ async def analyze_audio(
     stems: int = Query(2, description="Number of stems (e.g., 2 or 5)"),
     model: str = Query("spleeter", description="Model name")
 ):
-    try:
-        # Save uploaded file temporarily
-        input_path = f"/tmp/{file.filename}"
-        with open(input_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    os.makedirs("tmp", exist_ok=True)
+    # Generate a unique filename with timestamp and UUID
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = uuid.uuid4().hex[:8]
+    base_name = Path(file.filename).stem
+    ext = Path(file.filename).suffix
+    unique_filename = f"{base_name}_{timestamp}_{unique_id}{ext}"
+    file_location = f"tmp/{unique_filename}"
+    print(f"Saving uploaded file to {file_location}")
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    print(f"Starting audio processing with {model} model and {stems} stems...")
+    service = AudioService(model_name=model)
+    output_dir = service.process_audio(file_location, stems)
+    print(f"Output directory: {output_dir}")
+    output_path = Path(output_dir)
+    files_to_zip = list(output_path.rglob('*.*'))  # Find all files recursively
+    print(f"Found {len(files_to_zip)} files to zip:")
+    for f in files_to_zip:
+        print(f" - {f} (exists: {f.exists()}, size: {f.stat().st_size} bytes)")
+    archive_name = f"separated_audio_{base_name}_{timestamp}_{unique_id}"
+    print(f"Creating zip archive '{archive_name}' with {len(files_to_zip)} files...")
 
-        # Call service
-        service = AudioService(model_name=model)
-        output_dir = service.process_audio(input_path, stems)
-        output_path = Path(output_dir)
+    file_response = create_zip_archive(
+        files=files_to_zip,
+        output_dir=output_path,
+        archive_name=archive_name
+    )
 
-        # Get all files in the output directory
-        files_to_zip = list(output_path.glob('*'))
-
-        # Create and return zip archive using utility function
-        return create_zip_archive(
-            files=files_to_zip,
-            output_dir=output_path,
-            archive_name=f"separated_audio_{file.filename}"
-        )
-
-    finally:
-        # Clean up
-        os.remove(input_path)
-        if os.path.exists(output_dir):
-            shutil.rmtree(output_dir)
+    print("Zip archive created successfully")
+    return file_response
