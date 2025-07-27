@@ -43,3 +43,4 @@ dist/
 
 # FastAPI static files (optional)
 staticfiles/
+/.idea/workspace.xml
